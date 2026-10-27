@@ -4,16 +4,14 @@ from collections import Counter
 
 from smartnotes.config import LABELS
 
-# Written from the category definitions in CATEGORY_GUIDE.md, not from the validation set.
+# Deliberately naive: only words that appear in the "Includes" column of CATEGORY_GUIDE.md,
+# plus their plain inflections. Not tuned on train.csv or validation.csv, so this is a fair
+# "what you get from the category definitions alone" reference point.
 KEYWORD_RULES = {
-    "Study": ["exam", "test", "quiz", "assignment", "homework", "lecture", "course",
-              "class", "study", "revise", "chapter", "professor", "tutorial", "syllabus"],
-    "Money": ["bill", "pay", "payment", "bank", "savings", "budget", "salary",
-              "insurance", "rent", "expenses", "credit", "balance", "transfer"],
-    "Travel": ["flight", "train", "bus", "hotel", "trip", "airport", "railway",
-               "journey", "itinerary", "boarding", "luggage", "cab", "sightseeing"],
-    "Shopping": ["buy", "order", "cart", "sale", "discount", "coupon", "return",
-                 "store", "supermarket", "delivery", "groceries", "exchange", "pickup"],
+    "Study": ["exam", "course", "tutorial", "assignment", "read"],
+    "Money": ["bill", "budget", "bank", "payment", "pay", "saving", "invest", "insurance"],
+    "Travel": ["trip", "reservation", "train", "bus", "flight", "hotel", "itinerary"],
+    "Shopping": ["buy", "order", "compar", "return"],
 }
 
 
