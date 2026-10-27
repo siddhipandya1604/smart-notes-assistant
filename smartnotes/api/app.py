@@ -8,16 +8,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from smartnotes.api.errors import install_error_handlers
-from smartnotes.api.routes import classify, health
+from smartnotes.api.routes import classify, health, notes
 from smartnotes.services.classifier import NoteClassifier
+from smartnotes.store.notes import NoteStore
 
 
-def create_app(classifier: NoteClassifier | None = None) -> FastAPI:
-    """Build the app. Tests pass their own classifier; production loads the saved model once at startup."""
+def create_app(classifier: NoteClassifier | None = None, store: NoteStore | None = None) -> FastAPI:
+    """Build the app. Tests pass their own classifier/store; production loads the saved model once
+    at startup and opens the SQLite database (data/notes.db, or $SMARTNOTES_DB)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.classifier = classifier or NoteClassifier.load()
+        app.state.store = store or NoteStore()
         yield
 
     app = FastAPI(title="Smart Notes Assistant", version="1.0.0", lifespan=lifespan)
@@ -30,6 +33,7 @@ def create_app(classifier: NoteClassifier | None = None) -> FastAPI:
     install_error_handlers(app)
     app.include_router(classify.router)
     app.include_router(health.router)
+    app.include_router(notes.router)
     return app
 
 

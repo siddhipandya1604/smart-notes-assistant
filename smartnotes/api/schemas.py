@@ -1,7 +1,9 @@
 """Request and response models. Validation here is what turns bad input into a 4xx."""
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, StrictStr, field_validator
 
-from smartnotes.config import MAX_TEXT_CHARS
+from smartnotes.config import LABELS, MAX_TEXT_CHARS
 
 
 class NoteText(BaseModel):
@@ -28,3 +30,22 @@ class ClassifyResponse(BaseModel):
     uncertain: bool
     confidence: float
     probabilities: dict[str, float]
+
+
+Category = Literal[*LABELS]  # the four allowed labels, exact spelling
+
+
+class NoteOut(BaseModel):
+    id: str
+    text: str
+    category: Category
+    uncertain: bool
+    confidence: float
+    source: str
+    created_at: str
+
+
+class LoadStarterResponse(BaseModel):
+    added: int
+    skipped: int
+    total: int
