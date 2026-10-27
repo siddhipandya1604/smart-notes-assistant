@@ -22,13 +22,15 @@ CANDIDATES = [
     ModelConfig("logreg word+char", kind="logreg", char_ngrams=True),
     ModelConfig("logreg word only", kind="logreg", char_ngrams=False),
     ModelConfig("naive bayes word+char", kind="nb", char_ngrams=True),
+    # The fix chosen in smartnotes/ml/experiments.py (grouped CV on train.csv only).
+    ModelConfig("naive bayes + fix", kind="nb", char_ngrams=True, normalize_numbers=True, drop_stopwords=True),
 ]
 
 # Share of in-scope notes we accept flagging. A flagged note keeps its best-guess category and
 # stays visible, so a spurious badge is cheap; a confident wrong label on a note that fits no
 # category is the failure the brief cares about. That is why the app ships the highest cap.
-IN_SCOPE_FLAG_CAPS = {"conservative": 0.10, "balanced": 0.15, "shipped": 0.20}
-SHIPPED_SETTING = "shipped"
+IN_SCOPE_FLAG_CAPS = {"5%": 0.05, "10%": 0.10, "20%": 0.20, "30%": 0.30}
+SHIPPED_SETTING = "20%"
 
 
 def out_of_fold_proba(cfg: ModelConfig, texts, labels) -> np.ndarray:
@@ -53,12 +55,15 @@ def print_tradeoff(thresholds: dict, in_scope_oof, oos_tune, oos_held, val_conf)
     print("threshold chosen from validation + the OOS tune half. 'validation' and 'OOS tune' are therefore")
     print("tuned-on; 'OOS held-out' and 'train OOF' (grouped, pessimistic) are the independent checks.\n")
     columns = [("OOS tune", 10), ("OOS held-out", 14), ("OOS all 12", 12), ("validation", 12), ("train OOF", 11)]
-    print(f"{'setting':<8}{'threshold':>11}" + "".join(f"{name:>{width}}" for name, width in columns))
+    print(f"{'in-scope cap':<14}{'threshold':>11}" + "".join(f"{name:>{width}}" for name, width in columns))
     oos_all = np.concatenate([oos_tune, oos_held])
+    by_threshold: dict[float, list[str]] = {}  # caps that land on the same threshold share a row
     for name, t in thresholds.items():
+        by_threshold.setdefault(t, []).append(name)
+    for t, names in by_threshold.items():
         shares = [flagged_share(c, t) for c in (oos_tune, oos_held, oos_all, val_conf, in_scope_oof)]
-        marker = " <- shipped" if name == SHIPPED_SETTING else ""
-        print(f"{name:<8}{t:>11.4f}" + "".join(f"{s:>{w}.0%}" for s, (_, w) in zip(shares, columns)) + marker)
+        marker = " <- shipped" if SHIPPED_SETTING in names else ""
+        print(f"{'/'.join(names):<14}{t:>11.4f}" + "".join(f"{s:>{w}.0%}" for s, (_, w) in zip(shares, columns)) + marker)
 
 
 def main() -> ModelBundle:
