@@ -65,11 +65,11 @@ def test_surrounding_whitespace_does_not_change_the_answer(client):
     assert classify(client, "  Book a train to Pune.  ").json() == classify(client, "Book a train to Pune.").json()
 
 
-def test_uncertain_flag_comes_from_the_model_threshold(classifier):
+def test_uncertain_flag_comes_from_the_model_threshold(classifier, store):
     """Same model and text; only the threshold moves, and the flag follows it."""
     text = "Confirm the bus seat for Pune."
-    always = TestClient(create_app(with_threshold(classifier, 1.01)))
-    never = TestClient(create_app(with_threshold(classifier, 0.0)))
+    always = TestClient(create_app(with_threshold(classifier, 1.01), store))
+    never = TestClient(create_app(with_threshold(classifier, 0.0), store))
     with always, never:
         assert classify(always, text).json()["uncertain"] is True
         assert classify(never, text).json()["uncertain"] is False

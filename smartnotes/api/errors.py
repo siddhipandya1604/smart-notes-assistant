@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from smartnotes.config import MAX_TEXT_CHARS
 
@@ -28,6 +29,10 @@ def _field(error: dict) -> str:
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"message": str(exc.detail)})
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         errors = [{"field": _field(e), "message": _friendly(e)} for e in exc.errors()]
