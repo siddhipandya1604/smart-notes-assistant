@@ -10,6 +10,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 
 from smartnotes.config import LABELS, MODEL_PATH, RANDOM_STATE
 from smartnotes.ml.preprocess import normalize
+from smartnotes.text import STOPWORDS
 
 
 @dataclass(frozen=True)
@@ -21,13 +22,13 @@ class ModelConfig:
     char_ngrams: bool = True      # add character n-grams next to word n-grams
     C: float = 10.0               # logistic regression inverse regularisation
     normalize_numbers: bool = False
-    drop_stopwords: bool = False  # English stop words are removed from the word features only
+    drop_stopwords: bool = False  # smartnotes.text.STOPWORDS are removed from the word features only
 
 
 def build_pipeline(cfg: ModelConfig) -> Pipeline:
     prep = partial(normalize, numbers=cfg.normalize_numbers)  # module-level -> picklable
     features = [("word", TfidfVectorizer(preprocessor=prep, ngram_range=(1, 2), sublinear_tf=True,
-                                         stop_words="english" if cfg.drop_stopwords else None))]
+                                         stop_words=sorted(STOPWORDS) if cfg.drop_stopwords else None))]
     if cfg.char_ngrams:
         features.append(("char", TfidfVectorizer(preprocessor=prep, analyzer="char_wb",
                                                  ngram_range=(2, 5), sublinear_tf=True)))
