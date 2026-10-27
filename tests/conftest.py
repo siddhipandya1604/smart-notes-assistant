@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from smartnotes.api.app import create_app
 from smartnotes.services.classifier import NoteClassifier
+from smartnotes.store.notes import NoteStore
 
 
 @pytest.fixture(scope="session")
@@ -14,8 +15,19 @@ def classifier() -> NoteClassifier:
 
 
 @pytest.fixture()
-def client(classifier):
-    with TestClient(create_app(classifier=classifier)) as c:
+def db_path(tmp_path):
+    """A throwaway database file, so tests never touch data/notes.db."""
+    return tmp_path / "notes.db"
+
+
+@pytest.fixture()
+def store(db_path) -> NoteStore:
+    return NoteStore(db_path)
+
+
+@pytest.fixture()
+def client(classifier, store):
+    with TestClient(create_app(classifier=classifier, store=store)) as c:
         yield c
 
 
