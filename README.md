@@ -37,6 +37,13 @@ Wait for `Application startup complete` (about 7 seconds: importing scikit-learn
 
 The trained model is committed (`models/notes_model.joblib`), so the app starts without training. Notes are stored in `data/notes.db` (SQLite, created on first run, gitignored). Set `SMARTNOTES_DB=/path/to/other.db` to use a different file.
 
+### The interface
+A Notion-style sidebar lists **All notes**, **Needs a look** and every label with its count. The page has a capture block (it shows the predicted label and confidence as you type; **Ctrl/⌘ + Enter** saves), a search bar (**Ctrl/⌘ K** or **/** jumps to it, **Esc** clears it) and three views of the same notes:
+- **Cards** and **List**: label, confidence, how long ago, delete on hover.
+- **Map**: an Obsidian-style graph with one hub per label and each note orbiting it. Hover a dot to read the note, click to jump to it. Dashed rings are notes the model isn't sure about.
+
+The theme follows your system (Auto) and can be set to Light or Dark from the sidebar. The URL hash can preset a view or theme, for example `http://127.0.0.1:8000/#map` or `#list&dark`.
+
 ### Load the sample notes (`N001`-`N012`)
 Either click **Load starter notes** in the UI, or run the one-liner:
 
