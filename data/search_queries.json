@@ -1,0 +1,16 @@
+[
+  {"query": "when is my flight?", "expected": ["N003"]},
+  {"query": "hotel", "expected": ["N007"]},
+  {"query": "what do I need to buy?", "expected": ["N004", "N012"]},
+  {"query": "money transfer", "expected": ["N006"]},
+  {"query": "when is my exam?", "expected": ["N001"]},
+  {"query": "rent", "expected": ["N010"]},
+  {"query": "what bills do I need to pay?", "expected": ["N002", "N010"]},
+  {"query": "trip to the station", "expected": ["N011"]},
+  {"query": "homework due soon", "expected": ["N005", "N009"]},
+  {"query": "where am I staying?", "expected": ["N007"]},
+  {"query": "refund broken item", "expected": ["N008"]},
+  {"query": "groceries", "expected": ["N012"]},
+  {"query": "savings", "expected": ["N006"]},
+  {"query": "stats coursework", "expected": ["N005"]}
+]
