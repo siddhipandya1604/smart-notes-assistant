@@ -4,6 +4,7 @@ Model selection and the uncertainty threshold use train.csv (cross-validated) an
 the out-of-scope notes. validation.csv and the other half are only read to report numbers.
 """
 import sys
+import warnings
 
 import numpy as np
 import sklearn
@@ -67,6 +68,9 @@ def print_tradeoff(thresholds: dict, in_scope_oof, oos_tune, oos_held, val_conf)
 
 
 def main() -> ModelBundle:
+    # scikit-learn 1.5.2 passes an `iprint` option that newer SciPy ignores with a warning on every
+    # logistic-regression fit. Harmless, but it buries the real output, so hide only that message.
+    warnings.filterwarnings("ignore", message="Unknown solver options")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # notes contain "₹"; Windows consoles default to cp1252
     X_train, y_train = load_labeled_csv(TRAIN_CSV)
