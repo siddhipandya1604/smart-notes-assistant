@@ -13,6 +13,7 @@ from sklearn.model_selection import cross_val_predict
 
 from smartnotes.config import OUT_OF_SCOPE_CSV, RANDOM_STATE, TRAIN_CSV, VALIDATION_CSV
 from smartnotes.ml.baseline import KeywordRulesBaseline, MajorityBaseline
+from smartnotes.ml.extended import train_extended
 from smartnotes.ml.evaluate import confusion_table, mistakes, per_category_report, score
 from smartnotes.ml.grouping import grouped_folds
 from smartnotes.ml.model import ModelBundle, ModelConfig, build_pipeline, save_bundle
@@ -128,6 +129,9 @@ def main() -> ModelBundle:
     )
     save_bundle(bundle)
     print(f"\nsaved model (uncertainty threshold {bundle.threshold:.4f}) -> models/notes_model.joblib")
+
+    train_extended()  # second model that also knows Health / Family / Home / Work (see extended.py)
+    print("saved extended model -> models/extended_model.joblib")
     return bundle
 
 
