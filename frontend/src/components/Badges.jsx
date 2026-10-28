@@ -12,11 +12,16 @@ export function needsReview(item) {
   return Boolean(item.uncertain) && (CORE.includes(item.label) || item.label === "Other");
 }
 
+export function LabelDot({ label }) {
+  return <span className={`dot l-${label}`} aria-hidden="true" />;
+}
+
 export function CategoryChip({ category }) {
   const extra = EXTRA.includes(category);
   return (
-    <span className={`chip cat-${category}`} title={extra ? "Outside the four core categories" : undefined}>
-      <span aria-hidden="true">{ICONS[category] || "🏷️"}</span> {category}
+    <span className={`chip l-${category}`} title={extra ? "Outside the four core categories" : undefined}>
+      <LabelDot label={category} />
+      {category}
     </span>
   );
 }
@@ -32,9 +37,11 @@ export function UncertainBadge({ confidence }) {
 export function ConfidenceMeter({ value, uncertain }) {
   const pct = Math.round(value * 100);
   return (
-    <div className="meter" role="img" aria-label={`Confidence ${pct}%`}>
-      <div className={`meter-fill ${uncertain ? "low" : ""}`} style={{ width: `${pct}%` }} />
+    <span className="meter" role="img" aria-label={`Confidence ${pct}%`} title={`Confidence ${pct}%`}>
+      <span className="meter-track">
+        <span className={`meter-fill ${uncertain ? "low" : ""}`} style={{ width: `${pct}%` }} />
+      </span>
       <span className="meter-label">{pct}%</span>
-    </div>
+    </span>
   );
 }

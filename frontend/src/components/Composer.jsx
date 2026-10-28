@@ -12,7 +12,7 @@ export default function Composer({ onSave }) {
   const [preview, setPreview] = useState(null);
   const debounced = useDebounced(text, 350);
 
-  // Live preview: ask the same model that will label the saved note.
+  // Live preview: ask the same models that will label the saved note.
   useEffect(() => {
     let current = true;
     if (!debounced.trim()) {
@@ -26,7 +26,7 @@ export default function Composer({ onSave }) {
   }, [debounced]);
 
   async function submit(event) {
-    event.preventDefault();
+    event?.preventDefault();
     if (!text.trim()) {
       setError("Write something first. An empty note can't be saved.");
       return;
@@ -47,14 +47,14 @@ export default function Composer({ onSave }) {
   const stale = preview && text.trim() !== debounced.trim();
 
   return (
-    <form className="card composer" onSubmit={submit} noValidate>
-      <label htmlFor="note-text" className="composer-title">New note</label>
+    <form className={`capture ${error ? "has-error" : ""}`} onSubmit={submit} noValidate>
       <textarea
         id="note-text"
+        aria-label="New note"
         value={text}
         maxLength={MAX}
-        rows={3}
-        placeholder="e.g. Practice machine learning for tomorrow's quiz"
+        rows={2}
+        placeholder="Write a note… the model files it as you type"
         aria-invalid={Boolean(error)}
         aria-describedby="note-error"
         onChange={(e) => {
@@ -66,24 +66,24 @@ export default function Composer({ onSave }) {
         }}
       />
       <div id="note-error" className="field-error" role="alert">{error}</div>
-
-      <div className="composer-row">
-        <div className={`preview ${preview ? "" : "empty"} ${stale ? "stale" : ""}`} aria-live="polite">
+      <div className="capture-row">
+        <div className={`preview ${stale ? "stale" : ""}`} aria-live="polite">
           {preview ? (
             <>
-              <span className="preview-label">Model thinks</span>
+              <span className="preview-label">Files under</span>
               <CategoryChip category={preview.label} />
               {needsReview(preview) && <UncertainBadge confidence={preview.label_confidence} />}
               <ConfidenceMeter value={preview.label_confidence} uncertain={needsReview(preview)} />
             </>
           ) : (
-            <span className="preview-label">Start typing to see the predicted category</span>
+            <span className="preview-label">Label and confidence appear here</span>
           )}
         </div>
-        <div className="composer-actions">
-          <span className="counter">{text.length}/{MAX}</span>
+        <div className="capture-actions">
+          {text.length > 0 && <span className="counter">{text.length}/{MAX}</span>}
+          <kbd title="Press Ctrl or ⌘ + Enter to save">⌘↵</kbd>
           <button className="btn primary" type="submit" disabled={saving}>
-            {saving ? "Saving…" : "Save note"}
+            {saving ? "Saving…" : "Add note"}
           </button>
         </div>
       </div>
