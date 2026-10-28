@@ -7,7 +7,9 @@ DATA_DIR = ROOT / "data"
 MODEL_PATH = ROOT / "models" / "notes_model.joblib"
 DB_PATH = Path(os.environ.get("SMARTNOTES_DB", DATA_DIR / "notes.db"))  # override to run a separate database
 
-TRAIN_CSV = DATA_DIR / "train.csv"
+FRONTEND_DIST = ROOT / "frontend" / "dist"  # created by `npm run build`; served at / when present
+
+TRAIN_CSV =DATA_DIR / "train.csv"
 VALIDATION_CSV = DATA_DIR / "validation.csv"
 OUT_OF_SCOPE_CSV = DATA_DIR / "out_of_scope_examples.csv"
 STARTER_NOTES_JSON = DATA_DIR / "starter_notes.json"

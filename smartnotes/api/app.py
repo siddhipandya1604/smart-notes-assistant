@@ -6,6 +6,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from smartnotes.config import FRONTEND_DIST
 
 from smartnotes.api.errors import install_error_handlers
 from smartnotes.api.routes import classify, health, notes, search
@@ -37,6 +40,8 @@ def create_app(classifier: NoteClassifier | None = None, store: NoteStore | None
     app.include_router(health.router)
     app.include_router(notes.router)
     app.include_router(search.router)
+    if FRONTEND_DIST.is_dir():  # last, so the API routes above win
+        app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="ui")
     return app
 
 
