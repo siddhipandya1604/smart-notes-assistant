@@ -7,10 +7,13 @@ router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 
 @router.get("", response_model=list[NoteOut])
-def list_notes(request: Request, category: Category | None = None, uncertain: bool | None = None):
-    """All saved notes in ID order. `category` matches the displayed category, so uncertain notes
-    appear under their best guess; `uncertain=true` lists only the flagged ones."""
-    return [n.to_dict() for n in request.app.state.store.list(category=category, uncertain=uncertain)]
+def list_notes(request: Request, category: Category | None = None, uncertain: bool | None = None,
+               label: str | None = None):
+    """All saved notes in ID order. `category` matches the four-label category (uncertain notes
+    appear under their best guess), `label` the label shown in the app (e.g. Health), and
+    `uncertain=true` lists only the flagged ones."""
+    notes = request.app.state.store.list(category=category, uncertain=uncertain, label=label)
+    return [n.to_dict() for n in notes]
 
 
 @router.post("", response_model=NoteOut, status_code=201)

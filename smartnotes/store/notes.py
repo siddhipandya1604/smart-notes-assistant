@@ -23,7 +23,9 @@ SCHEMA = (
         uncertain  INTEGER NOT NULL,
         confidence REAL NOT NULL,
         source     TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        label      TEXT NOT NULL DEFAULT '',
+        label_confidence REAL NOT NULL DEFAULT 0
     )""",
     "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL)",
 )
@@ -40,6 +42,11 @@ class NoteStore:
         with self._transaction() as conn:
             for statement in SCHEMA:
                 conn.execute(statement)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(notes)")}
+            for column, definition in (("label", "TEXT NOT NULL DEFAULT ''"),
+                                       ("label_confidence", "REAL NOT NULL DEFAULT 0")):
+                if column not in columns:  # database created before extended labels existed
+                    conn.execute(f"ALTER TABLE notes ADD COLUMN {column} {definition}")
             conn.execute("INSERT OR IGNORE INTO meta (key, value) VALUES ('next_num', ?)", (FIRST_USER_NOTE_NUMBER,))
 
     # -- connections -------------------------------------------------------------------------
@@ -70,7 +77,8 @@ class NoteStore:
     @staticmethod
     def _to_note(row: sqlite3.Row) -> Note:
         return Note(id=row["id"], text=row["text"], category=row["category"], uncertain=bool(row["uncertain"]),
-                    confidence=row["confidence"], source=row["source"], created_at=row["created_at"])
+                    confidence=row["confidence"], source=row["source"], created_at=row["created_at"],
+                    label=row["label"], label_confidence=row["label_confidence"])
 
     # -- writes ------------------------------------------------------------------------------
     def add(self, text: str, prediction: Prediction, source: str = "user") -> Note:
@@ -79,7 +87,7 @@ class NoteStore:
             num = conn.execute("SELECT value FROM meta WHERE key = 'next_num'").fetchone()["value"]
             conn.execute("UPDATE meta SET value = ? WHERE key = 'next_num'", (num + 1,))
             note = Note(f"N{num:03d}", text, prediction.category, prediction.uncertain,
-                        prediction.confidence, source, _now())
+                        prediction.confidence, source, _now(), prediction.label, prediction.label_confidence)
             self._insert(conn, num, note)
         return note
 
@@ -94,16 +102,18 @@ class NoteStore:
                 if conn.execute("SELECT 1 FROM notes WHERE id = ?", (note_id,)).fetchone():
                     continue
                 self._insert(conn, int(note_id[1:]), Note(note_id, text, prediction.category, prediction.uncertain,
-                                                          prediction.confidence, source, _now()))
+                                                          prediction.confidence, source, _now(), prediction.label,
+                                                          prediction.label_confidence))
                 added += 1
         return added
 
     @staticmethod
     def _insert(conn: sqlite3.Connection, num: int, note: Note) -> None:
         conn.execute(
-            "INSERT INTO notes (num, id, text, category, uncertain, confidence, source, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (num, note.id, note.text, note.category, int(note.uncertain), note.confidence, note.source, note.created_at),
+            "INSERT INTO notes (num, id, text, category, uncertain, confidence, source, created_at, label, "
+            "label_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (num, note.id, note.text, note.category, int(note.uncertain), note.confidence, note.source,
+             note.created_at, str(note.label), float(note.label_confidence)),
         )
 
     def delete(self, note_id: str) -> bool:
@@ -116,13 +126,34 @@ class NoteStore:
             row = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
         return self._to_note(row) if row else None
 
-    def list(self, category: str | None = None, uncertain: bool | None = None) -> list[Note]:
-        """Notes in ID order. `category` matches the displayed (best-guess) category, so uncertain
-        notes show up under it too; `uncertain` narrows to flagged / unflagged notes."""
+    def backfill_labels(self, classifier) -> int:
+        """Give notes saved before extended labels existed a label, and refresh their uncertain
+        marker from the same prediction (it is a model output, and the model has since improved).
+        The four-label category is left as it was. Returns how many notes were updated."""
+        with self._read() as conn:
+            rows = conn.execute("SELECT id, text FROM notes WHERE label = ''").fetchall()
+        if not rows:
+            return 0
+        predictions = classifier.predict_many([r["text"] for r in rows])
+        with self._transaction() as conn:
+            for row, prediction in zip(rows, predictions):
+                conn.execute("UPDATE notes SET label = ?, label_confidence = ?, uncertain = ? WHERE id = ?",
+                             (str(prediction.label), float(prediction.label_confidence),
+                              int(prediction.uncertain), row["id"]))
+        return len(rows)
+
+    def list(self, category: str | None = None, uncertain: bool | None = None,
+             label: str | None = None) -> list[Note]:
+        """Notes in ID order. `category` matches the four-label model's category (uncertain notes
+        show up under their best guess); `label` matches the label the app shows; `uncertain`
+        narrows to flagged / unflagged notes."""
         query, args = "SELECT * FROM notes WHERE 1 = 1", []
         if category is not None:
             query += " AND category = ?"
             args.append(category)
+        if label is not None:
+            query += " AND COALESCE(NULLIF(label, ''), category) = ?"
+            args.append(label)
         if uncertain is not None:
             query += " AND uncertain = ?"
             args.append(int(uncertain))
