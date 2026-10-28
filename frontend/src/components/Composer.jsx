@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useDebounced } from "../hooks/useDebounced.js";
-import { CategoryChip, ConfidenceMeter, UncertainBadge } from "./Badges.jsx";
+import { CategoryChip, ConfidenceMeter, UncertainBadge, needsReview } from "./Badges.jsx";
 
 const MAX = 1000;
 
@@ -72,9 +72,9 @@ export default function Composer({ onSave }) {
           {preview ? (
             <>
               <span className="preview-label">Model thinks</span>
-              <CategoryChip category={preview.category} />
-              {preview.uncertain && <UncertainBadge confidence={preview.confidence} />}
-              <ConfidenceMeter value={preview.confidence} uncertain={preview.uncertain} />
+              <CategoryChip category={preview.label} />
+              {needsReview(preview) && <UncertainBadge confidence={preview.label_confidence} />}
+              <ConfidenceMeter value={preview.label_confidence} uncertain={needsReview(preview)} />
             </>
           ) : (
             <span className="preview-label">Start typing to see the predicted category</span>

@@ -1,14 +1,15 @@
-import { CATEGORIES } from "../api/client.js";
-import { ICONS } from "./Badges.jsx";
+import { CORE, EXTRA, ICONS } from "./Badges.jsx";
 
+// The four core filters are always there. Health/Family/Home/Work/Other appear once a note has them.
 export default function FilterBar({ active, counts, onChange }) {
+  const shown = [...CORE, ...[...EXTRA, "Other"].filter((label) => counts[label] > 0 || label === active)];
   const filters = [
     { key: "All", label: "All", count: counts.All },
-    ...CATEGORIES.map((c) => ({ key: c, label: `${ICONS[c]} ${c}`, count: counts[c] })),
+    ...shown.map((label) => ({ key: label, label: `${ICONS[label]} ${label}`, count: counts[label] || 0 })),
     { key: "Uncertain", label: "⚠ Uncertain", count: counts.Uncertain },
   ];
   return (
-    <div className="filters" role="group" aria-label="Filter notes by category">
+    <div className="filters" role="group" aria-label="Filter notes by label">
       {filters.map((f) => (
         <button
           key={f.key}

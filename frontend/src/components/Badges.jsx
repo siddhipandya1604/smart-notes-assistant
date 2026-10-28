@@ -1,9 +1,22 @@
-export const ICONS = { Study: "📚", Money: "💰", Travel: "✈️", Shopping: "🛍️" };
+export const CORE = ["Study", "Money", "Travel", "Shopping"];
+export const EXTRA = ["Health", "Family", "Home", "Work"];
+export const ICONS = {
+  Study: "📚", Money: "💰", Travel: "✈️", Shopping: "🛍️",
+  Health: "💪", Family: "👨‍👩‍👧", Home: "🏠", Work: "💼", Other: "🗂️",
+};
+
+// The API's `uncertain` means "fits none of the four core categories, or the model isn't sure".
+// A note the model confidently recognises as Health/Family/Home/Work is not a mystery to the user,
+// so the amber badge is reserved for core labels the model doubts and for notes it can't place.
+export function needsReview(item) {
+  return Boolean(item.uncertain) && (CORE.includes(item.label) || item.label === "Other");
+}
 
 export function CategoryChip({ category }) {
+  const extra = EXTRA.includes(category);
   return (
-    <span className={`chip cat-${category}`}>
-      <span aria-hidden="true">{ICONS[category]}</span> {category}
+    <span className={`chip cat-${category}`} title={extra ? "Outside the four core categories" : undefined}>
+      <span aria-hidden="true">{ICONS[category] || "🏷️"}</span> {category}
     </span>
   );
 }

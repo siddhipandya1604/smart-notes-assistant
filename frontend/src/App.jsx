@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client.js";
 import Composer from "./components/Composer.jsx";
 import FilterBar from "./components/FilterBar.jsx";
+import { needsReview } from "./components/Badges.jsx";
 import NoteCard from "./components/NoteCard.jsx";
 import Toasts from "./components/Toasts.jsx";
 import { useDebounced } from "./hooks/useDebounced.js";
 
 function matchesFilter(note, filter) {
   if (filter === "All") return true;
-  if (filter === "Uncertain") return note.uncertain;
-  return note.category === filter; // uncertain notes show under their best-guess category
+  if (filter === "Uncertain") return needsReview(note);
+  return note.label === filter; // the label shown on the card; core labels are the four categories
 }
 
 export default function App() {
@@ -60,8 +61,9 @@ export default function App() {
   async function saveNote(text) {
     const note = await api.addNote(text);
     setNotes((prev) => [...prev, note]);
-    toast(note.uncertain ? `Saved as ${note.id}, marked uncertain (best guess: ${note.category})` : `Saved as ${note.id} · ${note.category}`,
-      note.uncertain ? "warn" : "ok");
+    const review = needsReview(note);
+    toast(review ? `Saved as ${note.id}, marked uncertain (best guess: ${note.label})` : `Saved as ${note.id} · ${note.label}`,
+      review ? "warn" : "ok");
   }
 
   async function removeNote(id) {
@@ -85,8 +87,8 @@ export default function App() {
   }
 
   const counts = useMemo(() => {
-    const c = { All: notes.length, Uncertain: notes.filter((n) => n.uncertain).length };
-    for (const n of notes) c[n.category] = (c[n.category] || 0) + 1;
+    const c = { All: notes.length, Uncertain: notes.filter(needsReview).length };
+    for (const n of notes) c[n.label] = (c[n.label] || 0) + 1;
     return { Study: 0, Money: 0, Travel: 0, Shopping: 0, ...c };
   }, [notes]);
 
