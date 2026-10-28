@@ -5,7 +5,7 @@ Every number below is printed by the code in this repository. Re-run `python tra
 ## Dataset and training
 - Training rows: 156
 - Validation rows: 50
-- Command that reproduces these numbers: `python train.py` (about 13 s on a laptop CPU; it also saves `models/notes_model.joblib`)
+- Command that reproduces these numbers: `python train.py` (about 75 s on a laptop CPU; it trains the four-label model described here, saves `models/notes_model.joblib`, then trains the extended label model described in "Labels beyond the four categories" and saves `models/extended_model.joblib`)
 - Baselines:
   - **Majority class** (always `Study`).
   - **Keyword rules**, written from the "Includes" column of `CATEGORY_GUIDE.md` only (`smartnotes/ml/baseline.py`). I had already read `validation.csv` when I first wrote them, and that first version scored 100% on it, so it was rewritten to use only words from the guide.
@@ -96,7 +96,9 @@ The single Travel word "station" is outweighed by many small Study-leaning chara
 
 ## Notes that fit no category
 
-- **How `uncertain` is decided:** the note is uncertain when the model's highest class probability is below a threshold (`smartnotes/ml/uncertainty.py`). `/classify` always still returns its best-guess category.
+> **What changed after the first version of this document.** The table below measures the *four-label model alone* (threshold 0.8971). The app now also asks a second, extended model (see "Labels beyond the four categories") and the shipped `uncertain` flag combines both. Combined numbers are in the second table of this section.
+
+- **How the four-label model decides `uncertain`:** the note is uncertain when its highest class probability is below a threshold (`smartnotes/ml/uncertainty.py`). `/classify` always still returns its best-guess category.
 - **How the threshold was chosen:** the 12 out-of-scope notes are split once with a seeded shuffle into 6 for choosing and 6 held out. Among thresholds that flag at most a chosen share of **validation** notes (the brief allows validation for this), I take the one that flags the most of the 6 tuning out-of-scope notes. The shipped model uses the 20% cap.
 - I did **not** train on `out_of_scope_examples.csv`. The classifier only ever sees the four categories, so the held-out six are a clean test of the flag.
 
@@ -109,7 +111,68 @@ The single Travel word "station" is outweighed by many small Study-leaning chara
 
 - **Why this trade-off:** a spurious "Uncertain" badge is cheap, since the note stays visible with its best-guess category, while a confident wrong label on a note that fits no category is the failure the brief is about. 20% is the highest cap that still flags a minority of validation notes (7 of 50). Past it, flagging 28% of normal notes starts to make the badge less useful.
 - **What is and is not independent evidence:** the "validation" and "tuning 6" columns were used to pick the threshold, so they are optimistic by construction. The honest checks are the **held-out 6** (100% flagged, but 6 notes means one note is 17 points) and the **grouped train out-of-fold** column (31%), which is a pessimistic bound because those folds hold back whole templates. Use ranges, not point values: roughly 80-100% of out-of-scope notes flagged, roughly 14-31% of in-scope notes flagged.
-- Of the 4 validation mistakes, 1 distinct mistake (the "cart" note) is flagged uncertain and 1 (railway station) is not.
+- With the four-label model alone, 1 of the 4 validation mistakes (the "cart" note) is flagged uncertain and the 3 railway-station notes are not. With the combined flag (below), 2 of the 4 are flagged: the cart note and one of the three railway notes.
+
+### What the app ships: the combined `uncertain` flag
+
+The extended model (more labels, more training notes) gives a second opinion. `uncertain` is **false** when it confidently names the same core label as the four-label model, **true** when it confidently names something outside the four (Health, Family, Home, Work), **true** when it confidently names a different core label, and otherwise falls back to the four-label rule. Measured on the same notes with the old rule and the new rule:
+
+| Notes | Flagged uncertain, four-label model only | Flagged uncertain, combined (shipped) |
+| --- | ---: | ---: |
+| `validation.csv`, 50 in-scope notes | 7 (14%) | **4 (8%)** |
+| The 12 out-of-scope notes | 11 (92%) | **12 (100%)** (but see below) |
+| Final set: 12 notes outside the four categories (Health/Family/Home/Work) | 7 | **11** |
+| Final set: 12 ordinary core-category notes | 2 | 2 |
+| Final set: 3 notes that fit nothing ("Other") | 2 | 2 |
+
+- **The 12 out-of-scope notes are no longer an independent test.** I wrote extra training notes after reading them, so words like "feed", "trash", "vitamins" and "neighbour" appear in training. The 12/12 is a development check. The clean evidence is the final-set rows: 11 of 12 notes outside the four categories are flagged, and 2 of the 3 "Other" notes. The final set has only 27 notes, so these are small counts.
+- **A known false negative:** "Write a poem about the monsoon." is predicted Study at 0.92 by both models, so it is *not* flagged. When the two models agree on a wrong core label, the combined rule clears the flag.
+
+## Labels beyond the four categories
+
+**The problem, as reported from using the app.** "I have an exam of ISRO tomorrow" was labelled Study but marked uncertain (0.83, below the 0.8971 threshold), and "I have to go to gym today at 6:00 p.m." came out as **Money** (0.47), because the model only has four labels and none fits. The causes: the training data is 156 templated notes (only 4 contain the word "exam", none "ISRO" or "gym"), and a four-label model has nothing to say about a workout.
+
+**The constraint.** The brief fixes `POST /classify` to exactly Study / Money / Travel / Shopping plus an `uncertain` flag, and reviewers re-run validation through it. So that contract is unchanged: `category` is still the four-label model's answer (validation accuracy 0.920, macro-F1 0.924, re-checked through the live endpoint). The additions sit beside it:
+
+- A second **extended model** that also knows **Health, Family, Home and Work**. It gives `label` and `label_confidence` (extra fields in `/classify`, shown in the app) and a second opinion on `uncertain`, as described above. A label is shown only above a threshold; otherwise it is `Other`.
+- It is trained on `train.csv` plus `data/extended_notes.csv`: 252 notes I wrote (Health 43, Family 39, Home 40, Work 38, and 24 / 24 / 22 / 22 more phrasings of Study / Money / Travel / Shopping). This is my own synthetic data, so it is only as good as my coverage of how people write notes.
+
+**Model choice** (grouped 5-fold CV on the 408 training notes, chosen by log-loss because the label threshold reads the probabilities. The selection uses only training-data CV, but note that I had already seen development-set results from an earlier Naive Bayes version, so the development set is not a blind test; the final set below is):
+
+| Candidate | grouped-CV accuracy | macro-F1 | log-loss |
+| --- | ---: | ---: | ---: |
+| Naive Bayes, word+char | 0.721 | 0.681 | 0.986 |
+| Naive Bayes, word only | 0.711 | 0.660 | 1.051 |
+| Logistic regression C=10, word+char | 0.750 | 0.715 | 0.983 |
+| **Logistic regression C=100, word+char (selected)** | **0.750** | **0.714** | **0.832** |
+| Logistic regression C=100, word only | 0.711 | 0.673 | 0.995 |
+
+The label threshold is 0.5749: the lowest cut-off at which grouped out-of-fold predictions are at least 90% correct. I first aimed for 95%, saw that it kept only 35 to 46% of cross-validated notes as labelled, and lowered the target to 90%; that was a judgement call made from cross-validation numbers, not from the final set. At that cut-off 65% of cross-validated notes keep a label. Grouped folds are pessimistic here, so shown labels should be right more often than that on ordinary notes.
+
+**What happened on the way (kept because it changed the design).** My first extended model used only about 14 to 18 hand-written notes per new class. Out-of-fold recall on the new classes was only 13 to 29%, and no threshold can fix that, because the model had not seen enough phrasings. Writing about 40 per class raised it (Naive Bayes 42 to 64%), and switching to logistic regression raised overall accuracy further. I also found training notes that were near-twins of the out-of-scope evaluation notes ("Feed the dog" / "Feed the cat", "take vitamins") and reworded them; a test now checks that no evaluation note is a training note.
+
+**Held-out results** (`python -m smartnotes.ml.evaluate_labels`; labels are mine; all of these use the app's combined classifier):
+
+| Set | Notes | Right label shown | Labelled Other |
+| --- | ---: | ---: | ---: |
+| `validation.csv` (four core labels) | 50 | 44 (88%) | 3 |
+| Development set, hand-written new notes | 18 | 16 | 1 |
+| Development set, the 12 out-of-scope notes (contaminated, see above) | 12 | 8 | 2 |
+| **Final set, written after the training data was frozen and read once** | **27** | **22 (81%)** | 4 |
+
+The five final-set misses, unedited:
+
+| Note | Expected | Shown | Why it matters |
+| --- | --- | --- | --- |
+| Reach the bus stand by 9 AM for the Surat bus. | Travel | Other (0.31) | "bus stand" and "Surat" are new; the four-label model still says Travel but is unsure |
+| Find a cheaper blender on the app. | Shopping | Other (0.38) | "blender" and "app" are unseen |
+| Go to the school parents meeting. | Family | Work (0.58) | "meeting" pulls towards Work |
+| Fill in the expense report for the business trip. | Work | Travel (0.92) | confidently wrong; both models say Travel, so it is not flagged |
+| Write a poem about the monsoon. | Other | Study (0.92) | confidently wrong; there is no "Other" class to learn from, only low confidence |
+
+**The two reported examples** (both were in the development set, never trained on): "I have an exam of ISRO tomorrow" is now Study at 0.98 with `uncertain: false` (was Study at 0.83, uncertain). "I have to go to gym today at 6:00 p.m." is now Health at 0.98 (was Money at 0.47); the contract's `category` is still one of the four (Money) and `uncertain` is true because it fits none of them, while the app shows Health without an amber badge.
+
+**Limits of this evidence.** The final set is 27 notes with labels I wrote, so 81% could easily be 70% or 90% on other notes. The model only knows words it saw: unfamiliar vocabulary becomes "Other" or a wrong guess, and a confident wrong label is possible (the last two rows). Extra labels are only the four I chose (Health, Family, Home, Work); adding a label means adding notes for it and retraining. Embeddings from a pretrained language model would generalise to unseen words much better, but need a large download, which I avoided so the project runs offline.
 
 ## What I tried to fix, and whether it worked
 - **Targeted mistake:** "I must reach the railway station by 10 AM." was predicted Study with 0.99 confidence. Evidence: the stop word "by" and the time "10 AM" outweighed "station".
@@ -137,3 +200,4 @@ The single Travel word "station" is outweighed by many small Study-leaning chara
 - Naive Bayes probabilities are overconfident: "water the plants" gets 0.93 for Money, and the railway-station mistake is confident. The `uncertain` flag catches notes that look unlike training data, not every wrong answer.
 - Topic search depends on the classifier. A query it is unsure about, or confidently wrong about, gets no topic boost or the wrong one.
 - The uncertainty threshold was partly tuned on validation (as the brief permits), so its validation flag rate is not an independent estimate.
+- The extended labels (Health, Family, Home, Work) come from 252 notes I wrote. Their 81% on the 27-note final set is a rough guide, not a guarantee, and a confident wrong label is possible when both models agree.
