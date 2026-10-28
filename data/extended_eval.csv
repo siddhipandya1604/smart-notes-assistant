@@ -1,0 +1,31 @@
+text,label,source
+I have an exam of ISRO tomorrow,Study,new
+I have to go to gym today at 6:00 p.m.,Health,new
+Revise organic chemistry before the NEET mock test.,Study,new
+Finish the machine learning assignment by midnight.,Study,new
+Pay the electricity bill online.,Money,new
+Move some money into my fixed deposit.,Money,new
+Book a bus to Ahmedabad for Friday.,Travel,new
+Pack warm clothes for the Shimla trip.,Travel,new
+Buy a pair of running shoes.,Shopping,new
+Order dog food from the pet store.,Shopping,new
+Morning jog at 6 AM.,Health,new
+Take the medicine after dinner.,Health,new
+Call my brother on his birthday.,Family,new
+Lunch with my parents on Sunday.,Family,new
+Sweep the terrace.,Home,new
+Fix the broken window latch.,Home,new
+Submit the sprint report to the team lead.,Work,new
+Prepare for the client demo on Tuesday.,Work,new
+Call grandma this weekend.,Family,out_of_scope
+Feed the cat before 8 AM.,Home,out_of_scope
+Doctor's appointment on Tuesday at 4 PM.,Health,out_of_scope
+Clean the balcony on Saturday.,Home,out_of_scope
+Go for a walk after dinner.,Health,out_of_scope
+Send a thank-you note to Priya.,Family,out_of_scope
+Drink more water every day.,Health,out_of_scope
+Pick up the kids from school at 3 PM.,Family,out_of_scope
+Charge the power bank tonight.,Home,out_of_scope
+Remember to take vitamins after breakfast.,Health,out_of_scope
+Take the trash out on Thursday night.,Home,out_of_scope
+Reply to the neighbour's message.,Family,out_of_scope

@@ -16,14 +16,18 @@
   --money: #0f9d6b;
   --travel: #0e86c9;
   --shopping: #e0507a;
+  --health: #d9480f;
+  --family: #9c36b5;
+  --home: #2f9e44;
+  --work: #5c6b7a;
   --radius: 14px;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { color-scheme: dark; --bg: #14161c; --surface: #1d2029; --surface-2: #262a35; --text: #e8eaf0; --muted: #9aa3b2; --border: #2e3340; --accent: #7c79ff; --accent-text: #11131a; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.35); --warn-bg: #3a2f12; --warn-text: #f3cd75; --warn-border: #6b5521; --study: #8b87ff; --money: #34d399; --travel: #4cb8f0; --shopping: #f27ba0; }
+  :root:not([data-theme="light"]) { color-scheme: dark; --bg: #14161c; --surface: #1d2029; --surface-2: #262a35; --text: #e8eaf0; --muted: #9aa3b2; --border: #2e3340; --accent: #7c79ff; --accent-text: #11131a; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.35); --warn-bg: #3a2f12; --warn-text: #f3cd75; --warn-border: #6b5521; --study: #8b87ff; --money: #34d399; --travel: #4cb8f0; --shopping: #f27ba0; --health: #ff8a5c; --family: #d07be6; --home: #5fd47a; --work: #93a4b5; }
 }
-:root[data-theme="dark"] { color-scheme: dark; --bg: #14161c; --surface: #1d2029; --surface-2: #262a35; --text: #e8eaf0; --muted: #9aa3b2; --border: #2e3340; --accent: #7c79ff; --accent-text: #11131a; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.35); --warn-bg: #3a2f12; --warn-text: #f3cd75; --warn-border: #6b5521; --study: #8b87ff; --money: #34d399; --travel: #4cb8f0; --shopping: #f27ba0; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #14161c; --surface: #1d2029; --surface-2: #262a35; --text: #e8eaf0; --muted: #9aa3b2; --border: #2e3340; --accent: #7c79ff; --accent-text: #11131a; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.35); --warn-bg: #3a2f12; --warn-text: #f3cd75; --warn-border: #6b5521; --study: #8b87ff; --money: #34d399; --travel: #4cb8f0; --shopping: #f27ba0; --health: #ff8a5c; --family: #d07be6; --home: #5fd47a; --work: #93a4b5; }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
@@ -74,6 +78,11 @@ textarea[aria-invalid="true"] { border-color: var(--danger); }
 .cat-Money { color: var(--money); background: color-mix(in srgb, var(--money) 13%, transparent); }
 .cat-Travel { color: var(--travel); background: color-mix(in srgb, var(--travel) 13%, transparent); }
 .cat-Shopping { color: var(--shopping); background: color-mix(in srgb, var(--shopping) 13%, transparent); }
+.cat-Health { color: var(--health); background: color-mix(in srgb, var(--health) 13%, transparent); }
+.cat-Family { color: var(--family); background: color-mix(in srgb, var(--family) 13%, transparent); }
+.cat-Home { color: var(--home); background: color-mix(in srgb, var(--home) 13%, transparent); }
+.cat-Work { color: var(--work); background: color-mix(in srgb, var(--work) 13%, transparent); }
+.cat-Other { color: var(--muted); background: var(--surface-2); }
 .badge-uncertain { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; color: var(--warn-text); background: var(--warn-bg); border: 1px dashed var(--warn-border); cursor: help; }
 
 .meter { position: relative; width: 96px; height: 18px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
@@ -100,6 +109,11 @@ textarea[aria-invalid="true"] { border-color: var(--danger); }
 .cat-border-Money { border-left-color: var(--money); }
 .cat-border-Travel { border-left-color: var(--travel); }
 .cat-border-Shopping { border-left-color: var(--shopping); }
+.cat-border-Health { border-left-color: var(--health); }
+.cat-border-Family { border-left-color: var(--family); }
+.cat-border-Home { border-left-color: var(--home); }
+.cat-border-Work { border-left-color: var(--work); }
+.cat-border-Other { border-left-color: var(--muted); }
 .note.is-uncertain { background-image: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--warn-border) 14%, transparent) 10px 11px); }
 .note-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .note-id { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: .8rem; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 6px; }

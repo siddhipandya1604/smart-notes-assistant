@@ -4,10 +4,11 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from smartnotes.config import LABELS
 
 
-def score(y_true, y_pred) -> dict:
+def score(y_true, y_pred, label_set=LABELS) -> dict:
+    """Accuracy and macro-F1 over `label_set` (the four core labels unless told otherwise)."""
     return {
         "accuracy": accuracy_score(y_true, y_pred),
-        "macro_f1": f1_score(y_true, y_pred, average="macro", labels=list(LABELS), zero_division=0),
+        "macro_f1": f1_score(y_true, y_pred, average="macro", labels=list(label_set), zero_division=0),
     }
 
 

@@ -25,6 +25,7 @@ def create_app(classifier: NoteClassifier | None = None, store: NoteStore | None
     async def lifespan(app: FastAPI):
         app.state.classifier = classifier or NoteClassifier.load()
         app.state.store = store or NoteStore()
+        app.state.store.backfill_labels(app.state.classifier)  # notes saved before extended labels existed
         app.state.search = NoteSearch(app.state.classifier)
         yield
 

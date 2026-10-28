@@ -6,7 +6,8 @@ Save short notes, have a **model I trained** sort them into **Study / Money / Tr
 | --- | --- |
 | Classifier | TF-IDF (word + character n-grams) into Multinomial Naive Bayes, trained on `data/train.csv` with scikit-learn |
 | Validation | accuracy **0.920**, macro-F1 **0.924** (baseline keyword rules: 0.560 / 0.529) |
-| Uncertainty | flagged when the model's top probability is below a learned threshold (0.8971): 100% of 6 held-out out-of-scope notes, 14% of validation notes |
+| Labels beyond the four | a second model also knows **Health, Family, Home, Work**, so "gym at 6 PM" is Health, not a bad Money guess: 22 of 27 held-out notes labelled correctly (81%) |
+| Uncertainty | the four-label model's top probability below a threshold (0.8971), combined with the extended model's second opinion: 8% of validation notes flagged, 11 of 12 notes outside the four categories flagged on the final set |
 | Search | hybrid of TF-IDF and the classifier's topic sense: hit rate @3 **0.86** vs **0.57** for a keyword baseline |
 | Stack | Python + FastAPI + SQLite, React (Vite) UI |
 
@@ -58,10 +59,11 @@ cd frontend && npm run dev                               # terminal 2 -> http://
 python train.py
 ```
 
-Reads `data/train.csv`, compares the baselines and three candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation accuracy, macro-F1, per-category scores, the confusion table and the mistakes, prints the uncertainty trade-off, and saves `models/notes_model.joblib` (the file the app loads). It takes about 13 seconds. Validation labels are never used for fitting or choosing the model.
+Reads `data/train.csv`, compares the baselines and three candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation accuracy, macro-F1, per-category scores, the confusion table and the mistakes, prints the uncertainty trade-off, and saves `models/notes_model.joblib`. It then trains the **extended label model** (`train.csv` + `data/extended_notes.csv`, five candidates compared by CV) and saves `models/extended_model.joblib`. Both files are loaded by the app. It takes about 75 seconds. Validation labels are never used for fitting or choosing a model.
 
 Related commands:
 ```bash
+python -m smartnotes.ml.evaluate_labels                  # shown-label accuracy and uncertain rates on the held-out sets
 python -m smartnotes.ml.experiments                      # the "try one fix" comparison
 python -m smartnotes.ml.explain "<note>" --expected Travel   # why a prediction went wrong: features + nearest training notes
 python eval_search.py                                    # search hit rate @3 for all approaches
@@ -76,10 +78,11 @@ curl -X POST http://127.0.0.1:8000/classify \
 ```
 
 ```json
-{"category":"Money","uncertain":false,"confidence":1.0,"probabilities":{"Money":1.0,"Shopping":0.0,"Study":0.0,"Travel":0.0}}
+{"category":"Money","uncertain":false,"confidence":1.0,"probabilities":{"Money":1.0,"Shopping":0.0,"Study":0.0,"Travel":0.0},"label":"Money","label_confidence":0.9886}
 ```
 
-- `category` is always one of `Study`, `Money`, `Travel`, `Shopping` (the model's best guess, even when unsure). `uncertain` is a JSON boolean. `confidence` and `probabilities` are extras.
+- `category` is always one of `Study`, `Money`, `Travel`, `Shopping` (the four-label model's best guess, even when unsure). `uncertain` is a JSON boolean. `confidence` and `probabilities` are extras.
+- `label` and `label_confidence` are extras for the app: the label also can be `Health`, `Family`, `Home`, `Work` or `Other`. For "I have to go to gym today at 6:00 p.m." the contract still returns one of the four in `category`, with `uncertain: true` because it fits none of them, while `label` is `Health`.
 - Invalid input (empty or whitespace text, missing field, non-string, `null`, a list, malformed JSON, more than 1,000 characters) returns **422** with `{"message": "...", "errors": [...]}`, and the server keeps working.
 - **Windows PowerShell** strips the inner quotes from `curl -d '{"text":...}'`. Use:
   `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/classify -ContentType application/json -Body '{"text":"Pay my electricity bill tomorrow."}'`
@@ -99,7 +102,7 @@ Other routes (interactive docs at `/docs`): `GET/POST /api/notes` (filters `?cat
 python -m pytest
 ```
 
-78 tests, about 12 seconds, no network or credentials. They run against a temporary database, never `data/notes.db`. They cover `/classify` (valid note, every invalid-input case, 1,000-character and `₹` text, determinism, and that the `uncertain` flag follows the model's threshold), saving and reloading notes across a restart, ID policy, idempotent starter loading, search, and the evaluation sets.
+93 tests, about 7 seconds, no network or credentials. They run against a temporary database, never `data/notes.db`. They cover `/classify` (valid note, every invalid-input case, 1,000-character and `₹` text, determinism, and that the `uncertain` flag follows the model's threshold), saving and reloading notes across a restart, ID policy, idempotent starter loading, search, and the evaluation sets.
 
 ## How it works
 
@@ -116,13 +119,15 @@ data/        supplied data + search_queries.json, search_no_match_queries.json
 tests/       pytest suite
 ```
 
-- **Uncertain notes.** The model's highest class probability must reach a threshold (0.8971, stored inside the model file). It was chosen from validation confidences and half of the out-of-scope notes; the other half is held out for reporting. The UI marks these notes and keeps them under their best-guess category.
+- **Two models.** The four-label model decides the contract's `category`. The extended model (also Health, Family, Home, Work, trained on 252 extra notes I wrote) decides the `label` shown in the app and gives a second opinion on `uncertain`. If `models/extended_model.joblib` is missing the app still runs on the four-label model alone.
+- **Uncertain notes.** The four-label model's highest probability must reach a threshold (0.8971, stored inside the model file); the extended model can overrule it when it confidently agrees (not uncertain) or confidently names a label outside the four (uncertain). The UI shows the amber badge only for notes the model cannot place or doubts, not for confidently recognised Health/Family/Home/Work notes.
 - **Search.** `score = tf-idf cosine + 0.5 * topic agreement`. The classifier also labels the query, so "money transfer" finds the savings note with no shared words. The topic boost turns off when the classifier is not confident about the query, so unfamiliar queries return nothing rather than unrelated notes.
 - **Why not an LLM?** The brief requires a trained classifier driving predictions, and the whole project runs offline on a CPU.
 
 ## Limitations (details in RESULTS.md)
 - The supplied data is synthetic and template-based, so 0.92 validation accuracy means "good on notes that look like the training templates". New phrasing (for example "railway station") can be confidently wrong.
 - Naive Bayes probabilities are overconfident. The uncertain flag catches notes unlike the training data, not every wrong answer; the threshold was partly tuned on validation, as the brief permits.
+- Labels beyond the four rest on 252 notes I wrote and only cover Health, Family, Home and Work. On a 27-note final set 22 got the right label; unfamiliar words become `Other` or a wrong guess, and when both models agree on a wrong core label (for example a poem labelled Study) the note is not flagged. Adding a label means adding notes for it and running `python train.py`.
 - Topic search relies on the classifier: a query it is unsure about gets no topic boost (for example `where am I staying?` finds nothing), and one it is wrongly sure about can return unrelated notes (`water the plants`).
 - The 12 starter notes hold 3 per category, which makes hit rate @3 generous; RESULTS.md also reports hit rate @1 and MRR.
 - The web UI was rendered and screenshot-checked, but not driven by automated browser tests; its endpoints are covered by the API tests.
