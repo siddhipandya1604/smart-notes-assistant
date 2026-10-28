@@ -26,10 +26,12 @@ class ClassifyRequest(NoteText):
 
 
 class ClassifyResponse(BaseModel):
-    category: str
+    category: str                 # one of the four contract labels
     uncertain: bool
     confidence: float
     probabilities: dict[str, float]
+    label: str                    # what the app shows: also Health, Family, Home, Work, or Other
+    label_confidence: float
 
 
 Category = Literal[*LABELS]  # the four allowed labels, exact spelling
@@ -39,6 +41,8 @@ class NoteOut(BaseModel):
     id: str
     text: str
     category: Category
+    label: str
+    label_confidence: float
     uncertain: bool
     confidence: float
     source: str

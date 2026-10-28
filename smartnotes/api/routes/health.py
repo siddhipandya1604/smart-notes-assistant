@@ -10,5 +10,6 @@ def health(request: Request) -> dict:
         "status": "ok",
         "model": classifier.model_name,
         "labels": classifier.labels,
+        "all_labels": classifier.all_labels,
         "uncertainty_threshold": round(classifier.threshold, 4),
     }
