@@ -1,7 +1,129 @@
 # Smart Notes Assistant
 
-Save notes, classify them into **Study / Money / Travel / Shopping** with a model trained on the supplied data, flag notes that fit no category as *uncertain*, and search them later.
+Save short notes, have a **model I trained** sort them into **Study / Money / Travel / Shopping**, get an honest **"Uncertain"** badge on notes that fit no category, and search them later by keyword or by a short question.
 
-> Work in progress. The full README (install, run, tests, limitations) is written in the final docs section.
+| | |
+| --- | --- |
+| Classifier | TF-IDF (word + character n-grams) into Multinomial Naive Bayes, trained on `data/train.csv` with scikit-learn |
+| Validation | accuracy **0.920**, macro-F1 **0.924** (baseline keyword rules: 0.560 / 0.529) |
+| Uncertainty | flagged when the model's top probability is below a learned threshold (0.8971): 100% of 6 held-out out-of-scope notes, 14% of validation notes |
+| Search | hybrid of TF-IDF and the classifier's topic sense: hit rate @3 **0.86** vs **0.57** for a keyword baseline |
+| Stack | Python + FastAPI + SQLite, React (Vite) UI |
 
-Assignment brief: [docs/assignment/TASK.md](docs/assignment/TASK.md)
+Full numbers, error analysis and limitations: [RESULTS.md](RESULTS.md). How AI tools were used: [AI_WORKFLOW.md](AI_WORKFLOW.md). Original brief: [docs/assignment/TASK.md](docs/assignment/TASK.md).
+
+## Requirements
+- Python 3.12 (developed and tested on 3.12.5)
+- Node.js 18+ and npm, **only** to build the web UI. Without Node the API and its interactive docs at `/docs` still work.
+- No paid service, API key, GPU or network access is needed at run time.
+
+## Quick start
+
+```bash
+# 1. install Python dependencies (pinned in requirements.txt)
+pip install -r requirements.txt
+
+# 2. build the web UI (once)
+cd frontend && npm install && npm run build && cd ..
+
+# 3. start the app: API and UI in one process
+python -m uvicorn smartnotes.api.app:app --host 127.0.0.1 --port 8000
+```
+
+Wait for `Application startup complete` (about 7 seconds: importing scikit-learn and loading the model). Then open **http://127.0.0.1:8000**. Requests take about 10-40 ms once it is up.
+
+> **Port already in use?** Any port works; pass a different `--port` (for example `8765`) and use it in the URLs below. On the machine this was developed on, port 8000 was held by another program.
+
+The trained model is committed (`models/notes_model.joblib`), so the app starts without training. Notes are stored in `data/notes.db` (SQLite, created on first run, gitignored). Set `SMARTNOTES_DB=/path/to/other.db` to use a different file.
+
+### Load the sample notes (`N001`-`N012`)
+Either click **Load starter notes** in the UI, or run the one-liner:
+
+```bash
+python -m smartnotes.store.starter
+```
+
+They keep their original IDs. Loading twice adds nothing, and notes you add yourself start at `N013` and never reuse an ID (even after deleting).
+
+### Development mode (hot reload)
+```bash
+python -m uvicorn smartnotes.api.app:app --port 8000     # terminal 1
+cd frontend && npm run dev                               # terminal 2 -> http://localhost:5173
+# if the API is on another port:  VITE_API_TARGET=http://127.0.0.1:8765 npm run dev
+```
+
+## Retrain the model (one command)
+
+```bash
+python train.py
+```
+
+Reads `data/train.csv`, compares the baselines and three candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation accuracy, macro-F1, per-category scores, the confusion table and the mistakes, prints the uncertainty trade-off, and saves `models/notes_model.joblib` (the file the app loads). It takes about 13 seconds. Validation labels are never used for fitting or choosing the model.
+
+Related commands:
+```bash
+python -m smartnotes.ml.experiments                      # the "try one fix" comparison
+python -m smartnotes.ml.explain "<note>" --expected Travel   # why a prediction went wrong: features + nearest training notes
+python eval_search.py                                    # search hit rate @3 for all approaches
+```
+
+## The `/classify` API
+
+```bash
+curl -X POST http://127.0.0.1:8000/classify \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Pay my electricity bill tomorrow."}'
+```
+
+```json
+{"category":"Money","uncertain":false,"confidence":1.0,"probabilities":{"Money":1.0,"Shopping":0.0,"Study":0.0,"Travel":0.0}}
+```
+
+- `category` is always one of `Study`, `Money`, `Travel`, `Shopping` (the model's best guess, even when unsure). `uncertain` is a JSON boolean. `confidence` and `probabilities` are extras.
+- Invalid input (empty or whitespace text, missing field, non-string, `null`, a list, malformed JSON, more than 1,000 characters) returns **422** with `{"message": "...", "errors": [...]}`, and the server keeps working.
+- **Windows PowerShell** strips the inner quotes from `curl -d '{"text":...}'`. Use:
+  `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/classify -ContentType application/json -Body '{"text":"Pay my electricity bill tomorrow."}'`
+
+Self-test supplied with the brief, and a replay of the validation set through the live endpoint:
+
+```bash
+python examples/test_api.py --url http://127.0.0.1:8000/classify
+python examples/replay_validation.py --url http://127.0.0.1:8000/classify   # reproduces the RESULTS.md validation numbers
+```
+
+Other routes (interactive docs at `/docs`): `GET/POST /api/notes` (filters `?category=` and `?uncertain=`), `GET/DELETE /api/notes/{id}`, `POST /api/notes/load-starter`, `GET /api/search?q=`, `GET /api/health`.
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+78 tests, about 12 seconds, no network or credentials. They run against a temporary database, never `data/notes.db`. They cover `/classify` (valid note, every invalid-input case, 1,000-character and `₹` text, determinism, and that the `uncertain` flag follows the model's threshold), saving and reloading notes across a restart, ID policy, idempotent starter loading, search, and the evaluation sets.
+
+## How it works
+
+```
+smartnotes/
+  ml/        preprocess, baselines, model pipeline, grouped CV, uncertainty threshold, explain, experiments, train
+  text.py    shared function-word stop list
+  services/  NoteClassifier: loads the saved model once, returns category / uncertain / confidence
+  store/     SQLite note store, ID policy, starter loader
+  search/    keyword, TF-IDF and hybrid retrievers, evaluation
+  api/       FastAPI app factory, routes (classify, notes, search, health), validation and error shape
+frontend/    React + Vite UI (composer with live preview, filters, search)
+data/        supplied data + search_queries.json, search_no_match_queries.json
+tests/       pytest suite
+```
+
+- **Uncertain notes.** The model's highest class probability must reach a threshold (0.8971, stored inside the model file). It was chosen from validation confidences and half of the out-of-scope notes; the other half is held out for reporting. The UI marks these notes and keeps them under their best-guess category.
+- **Search.** `score = tf-idf cosine + 0.5 * topic agreement`. The classifier also labels the query, so "money transfer" finds the savings note with no shared words. The topic boost turns off when the classifier is not confident about the query, so unfamiliar queries return nothing rather than unrelated notes.
+- **Why not an LLM?** The brief requires a trained classifier driving predictions, and the whole project runs offline on a CPU.
+
+## Limitations (details in RESULTS.md)
+- The supplied data is synthetic and template-based, so 0.92 validation accuracy means "good on notes that look like the training templates". New phrasing (for example "railway station") can be confidently wrong.
+- Naive Bayes probabilities are overconfident. The uncertain flag catches notes unlike the training data, not every wrong answer; the threshold was partly tuned on validation, as the brief permits.
+- Topic search relies on the classifier: a query it is unsure about gets no topic boost (for example `where am I staying?` finds nothing), and one it is wrongly sure about can return unrelated notes (`water the plants`).
+- The 12 starter notes hold 3 per category, which makes hit rate @3 generous; RESULTS.md also reports hit rate @1 and MRR.
+- The web UI was rendered and screenshot-checked, but not driven by automated browser tests; its endpoints are covered by the API tests.
+- Single user, single process; there is no authentication.
