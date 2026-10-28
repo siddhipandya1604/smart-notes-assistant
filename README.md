@@ -152,3 +152,73 @@ curl -X POST http://127.0.0.1:8000/classify \
   `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/classify -ContentType application/json -Body '{"text":"Pay my electricity bill tomorrow."}'`
 
 Other routes (interactive docs at `/docs`): `GET/POST /api/notes` (filters `?category=`, `?label=`, `?uncertain=`), `GET/DELETE /api/notes/{id}`, `POST /api/notes/load-starter`, `GET /api/search?q=`, `GET /api/health`.
+
+## 🔁 Reproduce every number
+
+```bash
+python train.py                                  # trains both models, prints metrics, mistakes and the uncertainty trade-off (~75 s)
+python -m smartnotes.ml.evaluate_labels          # shown-label accuracy and uncertain rates on the held-out sets
+python eval_search.py                            # search hit rate @3 for all approaches
+python -m smartnotes.ml.experiments              # the "try one fix" comparison
+python -m smartnotes.ml.explain "I must reach the railway station by 10 AM." --expected Travel   # why a prediction went wrong
+
+# against a running server:
+python examples/test_api.py --url http://127.0.0.1:8000/classify         # the brief's self-test
+python examples/replay_validation.py --url http://127.0.0.1:8000/classify # replays validation.csv through the live endpoint
+```
+
+`python train.py` reads `data/train.csv`, compares baselines and candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation metrics, then trains the extended model on `train.csv` + `data/extended_notes.csv`. **Validation labels are never used to fit or choose a model.** Seeds are fixed (`random_state=42`).
+
+## 🧪 Tests
+
+```bash
+python -m pytest
+```
+
+**93 tests, about 7 seconds, no network or credentials.** They run on a temporary database (never `data/notes.db`) and cover: `/classify` for a normal note and every invalid input, 1,000-character and `₹` text, determinism, and that the `uncertain` flag really follows the model's threshold; saving and reloading notes across a restart; the ID policy and idempotent starter loading; search and its edge cases (including notes with nothing to index); migration of an old database; and a guard that no evaluation note is a training note.
+
+## 🗂️ Project layout
+
+```
+smartnotes/
+  ml/         preprocessing, baselines, model pipelines, template-grouped CV, uncertainty threshold,
+              extended model, explain tool, experiments, train.py, evaluate_labels.py
+  text.py     shared function-word stop list
+  services/   NoteClassifier: loads both models once, returns category / uncertain / label / confidence
+  store/      SQLite note store, never-reused IDs, migration, idempotent starter loader
+  search/     keyword, TF-IDF and hybrid retrievers, evaluation harness
+  api/        FastAPI app factory, routes (classify, notes, search, health), validation and error shape
+frontend/     React + Vite UI (sidebar, capture block, search, cards / list / map)
+data/         supplied data, extra labelled notes, two evaluation sets, search query sets
+models/       the trained models (committed so the app starts without training)
+tests/        pytest suite          examples/   the brief's self-test and a validation replay
+docs/         the original brief and README screenshots
+```
+
+## ✅ How this maps to the brief
+
+| Part | Requirement | Where |
+| --- | --- | --- |
+| **A** | Add, save, view, filter, search, persist, load starter notes with their IDs | UI + `store/` + `api/routes/notes.py`; `python -m smartnotes.store.starter` |
+| **B** | A trained model, a baseline, one command, validation metrics, error analysis, one fix | `python train.py`; [RESULTS.md](RESULTS.md) |
+| **C** | A search test set (14 queries, 6 with no shared words), two or more approaches, hit rate @3 | `data/search_queries.json`, `python eval_search.py` |
+| **D** | Say when it is unsure, from the model's own output, with the trade-off reported | [RESULTS.md](RESULTS.md) "Notes that fit no category" |
+| **E** | `POST /classify` exactly as specified | [The `/classify` API](#-the-classify-api) |
+| **F** | Empty notes handled, tests with one command, docs, AI workflow | `python -m pytest`; [AI_WORKFLOW.md](AI_WORKFLOW.md) |
+
+## ⚠️ Limitations
+
+- The supplied data is synthetic and template-based, so 0.92 validation accuracy means "good on notes that look like the training templates". New phrasing can be confidently wrong: *"I must reach the railway station by 10 AM"* is labelled Study.
+- Naive Bayes probabilities are overconfident. The uncertain flag catches notes unlike the training data, not every wrong answer. When both models agree on a wrong core label (for example *"Write a poem about the monsoon"* labelled Study at 0.92) the note is **not** flagged.
+- The extra labels rest on 252 notes I wrote and cover only Health, Family, Home and Work. On a 27-note final set 22 got the right label. Unfamiliar words become `Other` or a wrong guess. Adding a label means adding notes for it and running `python train.py`.
+- Topic search depends on the classifier: a query it is unsure about gets no topic boost (`where am I staying?` finds nothing), and one it is wrongly sure about can return unrelated notes (`water the plants`).
+- The 12 starter notes hold 3 per category, which makes hit rate @3 generous, so RESULTS.md also reports hit rate @1 and MRR.
+- The UI was rendered and screenshot-checked but is not covered by automated browser tests; its endpoints are covered by the API tests.
+- Single user, single process, no authentication.
+
+## 🔭 What I would do next
+
+- Collect real, varied notes: the supplied data is a few dozen templates.
+- Tune the character n-gram range (the cause of the remaining railway-station mistake) and calibrate probabilities (for example `CalibratedClassifierCV`).
+- Replace the topic boost with sentence embeddings if a heavier install is acceptable, and test search on a set with more than 3 notes per category.
+- Add browser tests for the UI interactions.
