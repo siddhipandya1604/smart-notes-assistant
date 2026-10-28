@@ -45,6 +45,18 @@ class NoteOut(BaseModel):
     created_at: str
 
 
+class SearchResult(BaseModel):
+    note: NoteOut
+    score: float
+    match: Literal["keyword", "topic", "both"]  # shares words / same subject / both
+
+
+class SearchResponse(BaseModel):
+    query: str
+    results: list[SearchResult]
+    message: str | None = None  # set when there is nothing useful to show
+
+
 class LoadStarterResponse(BaseModel):
     added: int
     skipped: int
