@@ -9,12 +9,15 @@ from smartnotes.config import MAX_TEXT_CHARS
 
 def _friendly(error: dict) -> str:
     kind = error.get("type", "")
+    field = _field(error)  # "text" for note bodies, "q" for search, "body" for malformed JSON
     if kind == "missing":
-        return "The 'text' field is required."
+        return f"The '{field}' field is required."
     if kind == "string_too_long":
-        return f"A note can be at most {MAX_TEXT_CHARS} characters."
+        limit = (error.get("ctx") or {}).get("max_length", MAX_TEXT_CHARS)  # the limit that was actually broken
+        subject = "A search query" if field == "q" else "A note"
+        return f"{subject} can be at most {limit} characters."
     if kind in ("string_type", "string_strict"):
-        return "'text' must be a string."
+        return f"'{field}' must be a string."
     if kind == "json_invalid":
         return "The request body is not valid JSON."
     message = str(error.get("msg", "Invalid request."))

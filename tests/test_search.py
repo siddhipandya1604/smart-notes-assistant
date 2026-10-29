@@ -126,6 +126,29 @@ def test_a_saved_note_with_no_searchable_words_does_not_break_search(client):
     assert r.status_code == 200 and r.json()["results"] == []
 
 
+def test_search_query_too_long_names_the_search_limit(client):
+    """A 201-character query must report the 200-character search limit, not the note limit."""
+    r = client.get("/api/search", params={"q": "a" * 201})
+    assert r.status_code == 422
+    assert "search query" in r.json()["message"]
+    assert "200" in r.json()["message"] and "1000" not in r.json()["message"]
+    assert r.json()["errors"][0]["field"] == "q"
+
+
+def test_search_without_q_names_the_q_field(client):
+    r = client.get("/api/search")
+    assert r.status_code == 422
+    assert "'q'" in r.json()["message"] and "'text'" not in r.json()["message"]
+    assert r.json()["errors"][0]["field"] == "q"
+
+
+def test_note_too_long_still_reports_the_note_limit(client):
+    """The fix must not change the original wording for notes."""
+    r = client.post("/api/notes", json={"text": "x" * 1001})
+    assert r.status_code == 422
+    assert r.json()["message"] == "A note can be at most 1000 characters."
+
+
 def test_search_sees_notes_added_after_the_first_search(client):
     client.post("/api/notes", json={"text": "Book a train to Pune."})
     client.get("/api/search", params={"q": "train"})                    # builds the index
