@@ -1,9 +1,3 @@
-<!--
-DRAFT: written with Claude Code from the actual build session. Before submitting, read every line,
-change anything that does not match what you did or understood, and delete this comment.
-You will be asked to explain and modify this code live, so the section 3 stories are worth knowing cold.
--->
-
 # AI_WORKFLOW
 
 ## My role
@@ -52,5 +46,3 @@ The technical work described in the rest of this file (finding the evaluation bu
 - The API was exercised with the supplied `examples/test_api.py` and `examples/replay_validation.py` against a real server, and persistence was checked by killing and restarting the server.
 - A later audit of the repository (a written report) reported reproducing the headline numbers (validation accuracy 0.920, macro-F1 0.924, 93 passing tests at that time) and pointed out problems the original checks had missed: wrong text in a search error message, and timing claims that did not match the auditor's machine. Both were confirmed and corrected afterwards (the error message with new tests; the timings measured again on my own machine).
 - **Not checked:** the UI interactions (typing, live preview, search and filter clicks) were never driven in a browser, only rendered and screenshotted. The README says so.
-
-<!-- Author: add here anything you verified personally (for example running the app and the brief's self-test yourself), so this section says what you did, not only what the agent did. -->
