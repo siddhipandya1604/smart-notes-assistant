@@ -9,14 +9,16 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.5-F7931E?logo=scikitlearn&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-93%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-96%20passing-2ea44f)
 ![Offline](https://img.shields.io/badge/runs-100%25%20offline-8957e5)
 
 <img src="docs/screenshots/cards-dark.png" alt="Smart Notes in dark mode: a sidebar of labels, a capture block and colour-coded note cards" width="880">
 
 </div>
 
-> A take-home project for an AI Engineering internship: save notes, classify them with a **model I trained and evaluated myself**, measure how good the **search** is, and make the app **say when it is unsure** instead of forcing a note into the wrong box. No paid API, no GPU, no cloud: everything runs on a laptop CPU.
+> A take-home project for an AI Engineering internship: save notes, classify them with a **model trained and evaluated in this repository**, measure how good the **search** is, and make the app **say when it is unsure** instead of forcing a note into the wrong box. No paid API, no GPU, no cloud: everything runs on a laptop CPU.
+>
+> **Built with an AI coding agent (Claude Code).** [AI_WORKFLOW.md](AI_WORKFLOW.md) records how it was directed, what went wrong along the way and how the output was checked. Where this README or RESULTS.md says "I", it means the project's author working with that agent.
 
 Full numbers, error analysis and limitations are in **[RESULTS.md](RESULTS.md)**. How AI tools were used is in **[AI_WORKFLOW.md](AI_WORKFLOW.md)**. The original brief is in [docs/assignment/TASK.md](docs/assignment/TASK.md).
 
@@ -53,7 +55,7 @@ cd frontend && npm install && npm run build && cd ..
 python -m uvicorn smartnotes.api.app:app --host 127.0.0.1 --port 8000
 ```
 
-Wait for `Application startup complete` (about 7 seconds: scikit-learn import and model load), then open **http://127.0.0.1:8000**. Requests take about 10 to 40 ms once it is up.
+Wait for `Application startup complete` (about 3 to 7 seconds depending on the machine: scikit-learn import and model load; measured at 4 seconds on a Windows laptop), then open **http://127.0.0.1:8000**. Requests take about 10 to 40 ms once it is up.
 
 > **Port already in use?** Any port works. Pass a different `--port` (for example `8765`) and use it in the URLs below.
 
@@ -109,7 +111,7 @@ flowchart LR
 - **Two models, one contract.** The brief fixes `POST /classify` to four labels, so the four-label model decides the contract's `category` and nothing about it changes. A second model also knows **Health, Family, Home, Work**: it supplies the `label` the app shows and a second opinion on `uncertain`.
 - **Honest uncertainty.** A note is uncertain when the four-label model's top probability is below a learned threshold (0.8971), and the extended model can overrule it: *not* uncertain when it confidently agrees, *uncertain* when it confidently names something outside the four.
 - **Search that bridges words.** `score = tf-idf cosine + 0.5 × topic agreement`. The classifier also labels the *query*, so notes in the same topic get a boost even with no shared words. The boost switches off when the classifier is unsure about the query, so unfamiliar queries return nothing instead of unrelated notes.
-- **Why not an LLM?** The brief requires a trained classifier driving predictions, and keeping it classical makes the whole project reproducible offline in about a minute.
+- **Why not an LLM?** The brief requires a trained classifier driving predictions, and keeping it classical makes the whole project reproducible offline, with training taking from a few seconds to about a minute depending on the machine.
 
 ## 📊 Results at a glance
 
@@ -117,7 +119,7 @@ flowchart LR
 | --- | --- | --- |
 | **Classifier** (4 labels, validation) | accuracy **0.920**, macro-F1 **0.924** | majority-class baseline 0.300 / 0.115, keyword rules from the category guide 0.560 / 0.529 |
 | **Extended labels** (8 labels, held-out final set) | **22 of 27** right (81%) | hand-written notes, written after the training data was frozen and read once |
-| **Uncertain flag** | **8%** of validation notes flagged; **11 of 12** notes outside the four categories flagged | on the same held-out final set |
+| **Uncertain flag** | **8%** of validation notes flagged (4 of 50); on the held-out final set, **11 of 12** notes outside the four categories flagged | 8% is the combined flag the app ships. The four-label model alone flags 14% of validation at the same threshold, because the extended model clears some of its doubts (see RESULTS.md) |
 | **Search hit rate @3** | **0.86** hybrid vs **0.57** keyword and TF-IDF | with no shared words: 0.67 vs 0.00. Hit rate @1 is 0.71 vs 0.43 for category-only |
 | **API** | all checks of the supplied self-test pass | about 10 to 40 ms per request |
 
@@ -125,13 +127,13 @@ These are small, synthetic datasets, so read them as evidence of a sound method,
 
 ## 🔬 Engineering decisions worth reading
 
-The interesting parts of this project are the bugs I found in my own evaluation:
+The interesting parts of this project are the evaluation bugs that were found and fixed along the way. Several began as mistakes in the AI agent's first attempt (see [AI_WORKFLOW.md](AI_WORKFLOW.md)):
 
-1. **A baseline that cheated.** My first keyword baseline scored **100%** on validation, because I wrote it after reading the validation set. It is rebuilt from the category guide alone (now 0.56), and the commit says why.
-2. **Cross-validation that leaked.** `train.csv` is built from templates, so random folds put near-twins on both sides and looked far too good (CV 0.97 vs 0.88 on validation). That made my first uncertainty threshold flag **54%** of validation notes. Notes that are near-duplicates now stay in the same fold ([`grouping.py`](smartnotes/ml/grouping.py)).
+1. **A baseline that cheated.** The first keyword baseline scored **100%** on validation, because it was written after the validation set had been read. It is rebuilt from the category guide alone (now 0.56), and the commit says why.
+2. **Cross-validation that leaked.** `train.csv` is built from templates, so random folds put near-twins on both sides and looked far too good (CV 0.97 vs 0.88 on validation). That made the first uncertainty threshold flag **54%** of validation notes. Notes that are near-duplicates now stay in the same fold ([`grouping.py`](smartnotes/ml/grouping.py)).
 3. **A stop-word list that removed the best Money cue.** scikit-learn's English list drops `bill` (9 notes, all Money), `move` and `due`. A curated function-word list replaced it, guarded by a test ([`text.py`](smartnotes/text.py)).
 4. **Data, not a threshold.** The first extended model had 13 to 29% recall on new labels. No threshold fixes that; more varied training notes did.
-5. **Contaminated sets are labelled as such.** I wrote a second evaluation set *after* freezing the training data and read it once; `RESULTS.md` says which sets I had already looked at.
+5. **Contaminated sets are labelled as such.** A second evaluation set was written *after* freezing the training data and read once; `RESULTS.md` says which sets had already been looked at.
 
 ## 🔌 The `/classify` API
 
@@ -156,7 +158,7 @@ Other routes (interactive docs at `/docs`): `GET/POST /api/notes` (filters `?cat
 ## 🔁 Reproduce every number
 
 ```bash
-python train.py                                  # trains both models, prints metrics, mistakes and the uncertainty trade-off (~75 s)
+python train.py                                  # trains both models, prints metrics, mistakes and the uncertainty trade-off (4 s to 75 s depending on the machine; 32 to 36 s in two runs on a Windows laptop)
 python -m smartnotes.ml.evaluate_labels          # shown-label accuracy and uncertain rates on the held-out sets
 python eval_search.py                            # search hit rate @3 for all approaches
 python -m smartnotes.ml.experiments              # the "try one fix" comparison
@@ -167,7 +169,9 @@ python examples/test_api.py --url http://127.0.0.1:8000/classify         # the b
 python examples/replay_validation.py --url http://127.0.0.1:8000/classify # replays validation.csv through the live endpoint
 ```
 
-`python train.py` reads `data/train.csv`, compares baselines and candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation metrics, then trains the extended model on `train.csv` + `data/extended_notes.csv`. **Validation labels are never used to fit or choose a model.** Seeds are fixed (`random_state=42`).
+`python train.py` reads `data/train.csv`, compares baselines and candidates by template-grouped 5-fold CV on the training data, fits the winner, prints validation metrics, then trains the extended model on `train.csv` + `data/extended_notes.csv`. **Validation labels are never used to fit a model or to choose one.** The uncertainty threshold is different: it is chosen from validation *confidences* (not labels) plus half of the out-of-scope notes, as the brief allows. So the validation flagged-rate is tuned-on; the held-out half of the out-of-scope notes and the final set are the independent checks (see RESULTS.md). Seeds are fixed (`random_state=42`).
+
+**Retraining and the committed model files.** Retraining gives the same predictions and thresholds (checked: identical probabilities and thresholds 0.8971 and 0.5749) but not identical bytes, so `git status` will show `models/*.joblib` as modified. Run `git checkout -- models` to restore the committed files.
 
 ## 🧪 Tests
 
@@ -175,7 +179,7 @@ python examples/replay_validation.py --url http://127.0.0.1:8000/classify # repl
 python -m pytest
 ```
 
-**93 tests, about 7 seconds, no network or credentials.** They run on a temporary database (never `data/notes.db`) and cover: `/classify` for a normal note and every invalid input, 1,000-character and `₹` text, determinism, and that the `uncertain` flag really follows the model's threshold; saving and reloading notes across a restart; the ID policy and idempotent starter loading; search and its edge cases (including notes with nothing to index); migration of an old database; and a guard that no evaluation note is a training note.
+**96 tests, about 5 to 12 seconds, no network or credentials.** They run on a temporary database (never `data/notes.db`) and cover: `/classify` for a normal note and every invalid input (with the right field and limit named in each error message, for notes and for search), 1,000-character and `₹` text, determinism, and that the `uncertain` flag really follows the model's threshold; saving and reloading notes across a restart; the ID policy and idempotent starter loading; search and its edge cases (including notes with nothing to index); migration of an old database; and a guard that no evaluation note is a training note.
 
 ## 🗂️ Project layout
 
@@ -210,8 +214,9 @@ docs/         the original brief and README screenshots
 
 - The supplied data is synthetic and template-based, so 0.92 validation accuracy means "good on notes that look like the training templates". New phrasing can be confidently wrong: *"I must reach the railway station by 10 AM"* is labelled Study.
 - Naive Bayes probabilities are overconfident. The uncertain flag catches notes unlike the training data, not every wrong answer. When both models agree on a wrong core label (for example *"Write a poem about the monsoon"* labelled Study at 0.92) the note is **not** flagged.
-- The extra labels rest on 252 notes I wrote and cover only Health, Family, Home and Work. On a 27-note final set 22 got the right label. Unfamiliar words become `Other` or a wrong guess. Adding a label means adding notes for it and running `python train.py`.
+- The extra labels rest on 252 notes written for this project and cover only Health, Family, Home and Work. On a 27-note final set 22 got the right label. Unfamiliar words become `Other` or a wrong guess. Adding a label means adding notes for it and running `python train.py`.
 - Topic search depends on the classifier: a query it is unsure about gets no topic boost (`where am I staying?` finds nothing), and one it is wrongly sure about can return unrelated notes (`water the plants`).
+- The topic boost uses the **four-label model only**, so notes labelled Health, Family, Home or Work get no useful topic boost (a gym note is treated as Money for search; `gym` finds it by keyword, but `workout` and `exercise` find nothing). In a category with many notes the boost raises all of them almost equally, so it acts like a category filter (checked with 40 extra bill notes: all 43 results were topic matches and the savings note ranked second).
 - The 12 starter notes hold 3 per category, which makes hit rate @3 generous, so RESULTS.md also reports hit rate @1 and MRR.
 - The UI was rendered and screenshot-checked but is not covered by automated browser tests; its endpoints are covered by the API tests.
 - Single user, single process, no authentication.

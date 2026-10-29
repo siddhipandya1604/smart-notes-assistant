@@ -1,11 +1,13 @@
 # RESULTS
 
+> **Who "I" is.** This project was built by its author working with an AI coding agent (Claude Code); see [AI_WORKFLOW.md](AI_WORKFLOW.md). Where this document says "I" (for example "I tried", "I chose", "I wrote"), it describes work done in that session by the agent under the author's direction, not independent work by the author alone. The numbers themselves are all reproducible from the code.
+
 Every number below is printed by the code in this repository. Re-run `python train.py`, `python -m smartnotes.ml.experiments` and `python eval_search.py`, or replay validation through a live server with `python examples/replay_validation.py`.
 
 ## Dataset and training
 - Training rows: 156
 - Validation rows: 50
-- Command that reproduces these numbers: `python train.py` (about 75 s on a laptop CPU; it trains the four-label model described here, saves `models/notes_model.joblib`, then trains the extended label model described in "Labels beyond the four categories" and saves `models/extended_model.joblib`)
+- Command that reproduces these numbers: `python train.py` (from a few seconds to about a minute depending on the machine: 32 s and 36 s in two runs on the Windows laptop used for the final check, 75 s in an earlier run on the same machine while it was busy, and about 4 s on a Linux machine used for an independent audit; it trains the four-label model described here, saves `models/notes_model.joblib`, then trains the extended label model described in "Labels beyond the four categories" and saves `models/extended_model.joblib`)
 - Baselines:
   - **Majority class** (always `Study`).
   - **Keyword rules**, written from the "Includes" column of `CATEGORY_GUIDE.md` only (`smartnotes/ml/baseline.py`). I had already read `validation.csv` when I first wrote them, and that first version scored 100% on it, so it was rewritten to use only words from the guide.
@@ -199,5 +201,7 @@ The five final-set misses, unedited:
 - **How much I trust the validation score:** not much on its own. Fifty notes built from templates means the three railway-station notes (one mistake) cost 6 accuracy points, and its near-twins with train notes make easy cases easy. The gap between random-fold CV (0.97) and validation (0.88) shows how misleading in-distribution scores can be, and notes with a new template will probably score lower than 0.92. I would read 0.92 as "good on notes that look like the training templates".
 - Naive Bayes probabilities are overconfident: "water the plants" gets 0.93 for Money, and the railway-station mistake is confident. The `uncertain` flag catches notes that look unlike training data, not every wrong answer.
 - Topic search depends on the classifier. A query it is unsure about, or confidently wrong about, gets no topic boost or the wrong one.
+- Topic search uses the **four-label model only**. A note labelled Health, Family, Home or Work is treated by search as whichever core category the four-label model picks for it (the gym note: Money at 0.47; "Yoga class on Saturday at 8 AM." Study at 0.98). In a check on a small corpus, the query `gym` found the gym note by keyword, while `workout` and `exercise` returned nothing. Search does not use the extended model's labels.
+- In a category with many notes the topic boost raises all of them almost equally, so the hybrid behaves like a category filter. Checked by adding 40 "Pay the electricity bill for flat N." notes to the 12 starter notes: `money transfer` returned 43 results, all tagged "topic", with the savings note (N006) ranked 2nd at 0.569 behind N010 at 0.578, and the next results all tied at 0.5. Word overlap decides the order only when words are shared. This is also why hit rate @1 and MRR, not hit rate @3, are the evidence that words help.
 - The uncertainty threshold was partly tuned on validation (as the brief permits), so its validation flag rate is not an independent estimate.
 - The extended labels (Health, Family, Home, Work) come from 252 notes I wrote. Their 81% on the 27-note final set is a rough guide, not a guarantee, and a confident wrong label is possible when both models agree.

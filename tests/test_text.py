@@ -1,8 +1,7 @@
 import re
 
-from smartnotes.config import TRAIN_CSV, VALIDATION_CSV
+from smartnotes.config import TRAIN_CSV
 from smartnotes.ml.preprocess import load_labeled_csv
-from smartnotes.store.starter import read_starter_notes
 from smartnotes.text import STOPWORDS
 
 
